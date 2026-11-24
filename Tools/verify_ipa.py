@@ -13,6 +13,8 @@ probes = [
     b'multipart/x-mixed-replace',
     'CarWithin · 车机模式'.encode(),
     b'carwithin-relay.poki-yg.workers.dev',
+    b'carwithin.mjpegFPS',
+    '中继上行跟不上'.encode(),
 ]
 
 data = IPA.read_bytes()
