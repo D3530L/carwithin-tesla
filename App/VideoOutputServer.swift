@@ -550,14 +550,21 @@ final class VideoOutputServer {
 
     private func ensureMJPEG() {
         if mjpeg != nil { return }
-        let encoder = MJPEGTranscoder(targetFPS: 15, maximumWidth: min(width, 1280), quality: 0.55)
+        // Cellular uplink is the bottleneck when the car connects through the relay, so the
+        // defaults stay deliberately modest; UserDefaults can raise them for LAN use.
+        let defaults = UserDefaults.standard
+        let fps = (defaults.object(forKey: "carwithin.mjpegFPS") as? NSNumber)?.doubleValue ?? 12
+        let maximumWidth = (defaults.object(forKey: "carwithin.mjpegWidth") as? NSNumber)?.intValue
+            ?? min(width, 1024)
+        let quality = CGFloat((defaults.object(forKey: "carwithin.mjpegQuality") as? NSNumber)?.doubleValue ?? 0.5)
+        let encoder = MJPEGTranscoder(targetFPS: fps, maximumWidth: maximumWidth, quality: quality)
         encoder.onLog = { [weak self] message in self?.onLog?(message) }
         encoder.onJPEG = { [weak self] jpeg, jpegWidth, jpegHeight in
             guard let self else { return }
             self.queue.async { self.broadcastMJPEG(jpeg, width: jpegWidth, height: jpegHeight) }
         }
         mjpeg = encoder
-        report("已启用 MJPEG 车机输出（\(min(width, 1280)) 宽以内，最高 15 帧）")
+        report("已启用 MJPEG 车机输出（\(maximumWidth) 宽以内，最高 \(Int(fps)) 帧，质量 \(quality)）")
     }
 
     private func pushMJPEG(_ frame: Frame) {

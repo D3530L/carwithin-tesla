@@ -25,6 +25,11 @@ final class RelayClient {
     private var stopped = false
     private var lastFrameAt: TimeInterval = 0
     private var framesSent = 0
+    private var droppedFrames = 0
+    /// Bytes handed to the WebSocket but not yet written: JPEG must never queue up behind a slow
+    /// cellular uplink, so frames are dropped instead of growing latency.
+    private var pendingBytes = 0
+    private let maximumPendingBytes = 1_500_000
 
     init(host: String, key: String) {
         self.host = host
@@ -188,19 +193,30 @@ final class RelayClient {
 
     // MARK: outbound
 
-    /// Called for every encoded JPEG; drops frames when no car is attached.
+    /// Called for every encoded JPEG; drops frames when no car is attached or the uplink lags.
     func send(jpeg: Data) {
         queue.async { [weak self] in
             guard let self, let socket = self.task, !self.streams.isEmpty else { return }
+            guard self.pendingBytes < self.maximumPendingBytes else {
+                self.droppedFrames += 1
+                if self.droppedFrames % 50 == 1 {
+                    self.onLog?("中继上行跟不上，已丢 \(self.droppedFrames) 帧")
+                }
+                return
+            }
             self.lastFrameAt = ProcessInfo.processInfo.systemUptime
             self.framesSent += 1
-            for id in self.streams {
+            let ids = self.streams
+            for id in ids {
                 var frame = Data(capacity: jpeg.count + 4)
                 frame.append(UInt8((id >> 24) & 0xff)); frame.append(UInt8((id >> 16) & 0xff))
                 frame.append(UInt8((id >> 8) & 0xff)); frame.append(UInt8(id & 0xff))
                 frame.append(jpeg)
-                socket.send(.data(frame)) { error in
-                    if let error { self.onLog?("中继发送失败：\(error.localizedDescription)") }
+                let size = frame.count
+                self.pendingBytes += size
+                socket.send(.data(frame)) { [weak self] error in
+                    self?.queue.async { self?.pendingBytes -= size }
+                    if let error { self?.onLog?("中继发送失败：\(error.localizedDescription)") }
                 }
             }
         }
