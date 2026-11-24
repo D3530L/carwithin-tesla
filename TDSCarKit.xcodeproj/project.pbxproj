@@ -36,6 +36,7 @@
 		25C6A5EDB9C7A8CB59B0E58B /* Sources/TDSCarKitCore/Vendor/BigInt/Subtraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 826A5AE3BFE61047AD29D186 /* Sources/TDSCarKitCore/Vendor/BigInt/Subtraction.swift */; };
 		2AD4CB8F61CAF801CA8F8E0A /* Sources/TDSCarKitCore/Vendor/BigInt/Integer Conversion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C22523C685FF3D5D1E5DEBD /* Sources/TDSCarKitCore/Vendor/BigInt/Integer Conversion.swift */; };
 		2E2D3509DE30136BB95409EE /* App/BrowserReceiverPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C60B0AAF013CD73B180689D /* App/BrowserReceiverPage.swift */; };
+		6A58C75CC6A1BA2E1A2302DB /* App/RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FA34AFAF3583F1E64A531CF /* App/RelayClient.swift */; };
 		F02FEEE412AD37A4151855FF /* App/TeslaReceiverPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 402082A7D706C0A49A407433 /* App/TeslaReceiverPage.swift */; };
 		BD02E873A1AF5DFE86AF2283 /* App/MJPEGTranscoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9575F633C1E6C086C2867527 /* App/MJPEGTranscoder.swift */; };
 		317280AA587980E347998259 /* App/SameDeviceProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E16358245C1D6E4C9ECD5FA /* App/SameDeviceProbe.swift */; };
@@ -159,6 +160,7 @@
 		826A5AE3BFE61047AD29D186 /* Sources/TDSCarKitCore/Vendor/BigInt/Subtraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TDSCarKitCore/Vendor/BigInt/Subtraction.swift; sourceTree = "<group>"; };
 		88EE41E90E802F76407F8E4E /* App/AirPlayCredentials.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/AirPlayCredentials.swift; sourceTree = "<group>"; };
 		8C60B0AAF013CD73B180689D /* App/BrowserReceiverPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/BrowserReceiverPage.swift; sourceTree = "<group>"; };
+		9FA34AFAF3583F1E64A531CF /* App/RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/RelayClient.swift; sourceTree = "<group>"; };
 		402082A7D706C0A49A407433 /* App/TeslaReceiverPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/TeslaReceiverPage.swift; sourceTree = "<group>"; };
 		9575F633C1E6C086C2867527 /* App/MJPEGTranscoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/MJPEGTranscoder.swift; sourceTree = "<group>"; };
 		94C09502D8BCE582091447F6 /* Sources/TDSCarKitCore/Vendor/BigInt/BigInt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sources/TDSCarKitCore/Vendor/BigInt/BigInt.swift; sourceTree = "<group>"; };
@@ -224,6 +226,7 @@
 				0FC063C47C1B6FBDC0FB3C93 /* App/BLEBootstrap.swift */,
 				575E3399A1442CCAC5A79931 /* App/BackgroundKeepAlive.swift */,
 				8C60B0AAF013CD73B180689D /* App/BrowserReceiverPage.swift */,
+				9FA34AFAF3583F1E64A531CF /* App/RelayClient.swift */,
 				402082A7D706C0A49A407433 /* App/TeslaReceiverPage.swift */,
 				9575F633C1E6C086C2867527 /* App/MJPEGTranscoder.swift */,
 				3C241FB52D18614C66A83C76 /* App/CarLifeOutput.swift */,
@@ -388,6 +391,7 @@
 				9AA8500AA5EED0F288E24FE1 /* App/BLEBootstrap.swift in Sources */,
 				D1C0F3DD0BE894216FC7E7D7 /* App/BackgroundKeepAlive.swift in Sources */,
 				2E2D3509DE30136BB95409EE /* App/BrowserReceiverPage.swift in Sources */,
+				6A58C75CC6A1BA2E1A2302DB /* App/RelayClient.swift in Sources */,
 				F02FEEE412AD37A4151855FF /* App/TeslaReceiverPage.swift in Sources */,
 				BD02E873A1AF5DFE86AF2283 /* App/MJPEGTranscoder.swift in Sources */,
 				65EE858BFD0D425464E00224 /* App/CarLifeOutput.swift in Sources */,

@@ -73,5 +73,7 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
+	<key>CarWithinRelayHost</key>
+	<string>carwithin-relay.poki-yg.workers.dev</string>
 </dict>
 </plist>

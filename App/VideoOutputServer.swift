@@ -110,6 +110,8 @@ final class VideoOutputServer {
     private var hls: CarPlayHLS?
     /// JPEG transcode for viewers that have neither MediaSource nor WebCodecs (head units).
     private var mjpeg: MJPEGTranscoder?
+    /// Outbound relay so a head unit can reach this iPhone without inbound access.
+    private var relay: RelayClient?
     /// MJPEG viewers drop frames rather than queue: the next one is worth more than this one.
     private let mjpegBacklogLimit = 1_500_000
     #if DEBUG
@@ -174,6 +176,7 @@ final class VideoOutputServer {
     private func startOnQueue(port: UInt16, securePort: UInt16?, width: Int, height: Int, fps: Int, preferredViewer: UUID?,
                               browserAudio: Bool, airPlayStreamID: UUID?, airPlayAddress: String?) {
         stopOnQueue()
+        startRelayIfConfigured()
         self.browserAudio = browserAudio
         if let airPlayStreamID, let airPlayAddress {
             hls = CarPlayHLS(id: airPlayStreamID, origin: "http://\(airPlayAddress):\(port)")
@@ -558,11 +561,38 @@ final class VideoOutputServer {
     }
 
     private func pushMJPEG(_ frame: Frame) {
-        guard let mjpeg, clients.values.contains(where: { $0.mode == .mjpeg }) else { return }
-        mjpeg.submit(accessUnit: frame.annexB, codec: parameters.codec)
+        let local = clients.values.contains { $0.mode == .mjpeg }
+        let remote = relay?.wantsFrames ?? false
+        guard local || remote else { return }
+        if mjpeg == nil { ensureMJPEG() }
+        mjpeg?.submit(accessUnit: frame.annexB, codec: parameters.codec)
+    }
+
+    /// Starts the outbound relay when a host is configured (Info.plist default, UserDefaults wins).
+    private func startRelayIfConfigured() {
+        let defaults = UserDefaults.standard
+        let override = defaults.string(forKey: "carwithin.relayHost") ?? ""
+        let fallback = (Bundle.main.object(forInfoDictionaryKey: "CarWithinRelayHost") as? String) ?? ""
+        let host = override.isEmpty ? fallback : override
+        guard !host.isEmpty else { return }
+        var key = defaults.string(forKey: "carwithin.relayKey") ?? ""
+        if key.count < 8 {
+            let alphabet = Array("abcdefghijklmnopqrstuvwxyz0123456789")
+            key = String((0..<16).map { _ in alphabet.randomElement()! })
+            defaults.set(key, forKey: "carwithin.relayKey")
+        }
+        let client = RelayClient(host: host, key: key)
+        client.pageHTML = TeslaReceiverPage.html
+        client.onLog = { [weak self] message in self?.onLog?(message) }
+        client.onTouches = { [weak self] source, points in self?.onTouches?(source, points) }
+        relay = client
+        client.connect()
+        report("中继：\(client.address)")
     }
 
     private func broadcastMJPEG(_ jpeg: Data, width jpegWidth: Int, height jpegHeight: Int) {
+        // Cars attached through the relay get the same frames as local <img> viewers.
+        relay?.send(jpeg: jpeg)
         let viewers = clients.values.filter { $0.mode == .mjpeg }
         guard !viewers.isEmpty else { return }
         var chunk = Data("--frame\r\nContent-Type: image/jpeg\r\nContent-Length: \(jpeg.count)\r\n\r\n".utf8)
@@ -799,6 +829,7 @@ final class VideoOutputServer {
             client.connection.cancel()
         }
         clients.removeAll()
+        relay?.stop(); relay = nil
         primaryBrowser = nil; returningViewer = nil; nextBrowserOrder = 0
         parameters = VideoParameterSets(codec: .h264); format = nil; decoderRecord = nil; gop.removeAll(); gopBytes = 0
     }
