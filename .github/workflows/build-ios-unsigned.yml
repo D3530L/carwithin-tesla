@@ -1,0 +1,66 @@
+name: build-ios-unsigned
+
+# Builds an unsigned IPA for sideloading (no Apple account, no certificates needed here).
+# Trigger: Actions -> build-ios-unsigned -> Run workflow.
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - tesla-mjpeg
+      - main
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pick the newest Xcode
+        run: |
+          ls /Applications | grep -i '^Xcode' || true
+          NEWEST=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -n1)
+          if [ -n "$NEWEST" ]; then sudo xcode-select -s "$NEWEST"; fi
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos || true
+
+      - name: Show schemes
+        run: xcodebuild -list -project TDSCarKit.xcodeproj
+
+      - name: Build (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project TDSCarKit.xcodeproj \
+            -scheme TDSCarKit \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            ONLY_ACTIVE_ARCH=NO \
+            build 2>&1 | tee build.log | tail -n 120
+
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          APP_DIR=$(find build/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -n1)
+          echo "app: $APP_DIR"
+          test -n "$APP_DIR"
+          rm -rf out && mkdir -p out/Payload
+          cp -R "$APP_DIR" out/Payload/
+          /usr/bin/ditto -c -k --sequesterRsrc --keepParent out/Payload "CarWithin-unsigned.ipa"
+          ls -l CarWithin-unsigned.ipa
+          shasum -a 256 CarWithin-unsigned.ipa | tee CarWithin-unsigned.ipa.sha256
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: CarWithin-unsigned-ipa
+          path: |
+            CarWithin-unsigned.ipa
+            CarWithin-unsigned.ipa.sha256
+            build.log
+          if-no-failure: warn
+          retention-days: 14
