@@ -1,0 +1,15 @@
+name = "carwithin-relay"
+main = "worker.js"
+compatibility_date = "2025-10-01"
+workers_dev = true
+
+[observability]
+enabled = false
+
+[[durable_objects.bindings]]
+name = "DEVICE"
+class_name = "DeviceHub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["DeviceHub"]
