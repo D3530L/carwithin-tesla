@@ -59,20 +59,41 @@ def main() -> int:
         print('构建成功但没有 artifact')
         return 3
     OUT.mkdir(parents=True, exist_ok=True)
+
+    class NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            return None
+
+    opener = urllib.request.build_opener(NoRedirect)
     for art in items:
         print(f"下载 artifact: {art['name']} ({art['size_in_bytes']} 字节)")
         req = urllib.request.Request(art['archive_download_url'],
                                      headers={'Authorization': f'token {token}',
                                               'User-Agent': 'carwithin-port'})
-        with urllib.request.urlopen(req, timeout=180, follow_redirects=True) as resp:
-            blob = resp.read()
+        try:
+            with opener.open(req, timeout=60) as resp:
+                blob = resp.read()
+        except urllib.error.HTTPError as exc:
+            location = exc.headers.get('Location')
+            if exc.code not in (301, 302, 303, 307, 308) or not location:
+                raise
+            with urllib.request.urlopen(
+                    urllib.request.Request(location, headers={'User-Agent': 'carwithin-port'}),
+                    timeout=180) as resp:
+                blob = resp.read()
         with zipfile.ZipFile(io.BytesIO(blob)) as z:
             for name in z.namelist():
                 target = OUT / Path(name).name
                 target.write_bytes(z.read(name))
                 print(f'  解出 {target} ({target.stat().st_size} 字节)')
+    import shutil
+    desktop = Path.home() / 'Desktop'
     for ipa in OUT.glob('CarWithin-unsigned.ipa'):
         print(f'IPA 就绪: {ipa}')
+        if desktop.is_dir():
+            dest = desktop / 'CarWithin-1.0.4-tesla-unsigned.ipa'
+            shutil.copy2(ipa, dest)
+            print(f'已放到桌面: {dest} ({dest.stat().st_size} 字节)')
     return 0
 
 

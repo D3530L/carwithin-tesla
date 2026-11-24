@@ -1,58 +1,65 @@
-# 特斯拉车机投屏：限制与可行路线（CarWithin 适配笔记）
+# 特斯拉车机投屏：状态与实现（CarWithin 1.0.4 派生）
 
 更新：2026-11-25
 
-## 1. 特斯拉浏览器到底拦什么
+## 1. 结论先说
 
-固件黑名单是 RFC 1918 三段：`10.0.0.0/8`、`172.16.0.0/12`、`192.168.0.0/16`。
-表现为「无法访问 / 被拦截」，与证书、DNS、端口无关。
+- **特斯拉浏览器拒绝一切 RFC 1918 地址**（10/8、172.16/12、192.168/16），用域名指向私网也拒绝，且不走 IPv6。因此手机热点（172.20.10.x）直连必然失败。
+- 可行路线只有两条：**(a)** 让接收端落在 `100.64.0.0/10`（CGNAT，不在黑名单）；**(b)** 走公网中继，车机只看到公网 HTTPS 域名。
+- 上架同类 App（Tesmirror）用的是 **(b)**：`ios.tesmirror.com → 47.104.111.183`（阿里云），8888 端口开放，是云中转而非虚拟 IP。
+- 本仓库已实现 **(b)** 并在生产验证；**(a)** 需要路由器/盒子把 DHCP 网段改成 100.64.x（DashPlay 的做法）。
 
-证据：
+## 2. 已交付
 
-- SideDisplay 作者（HN）：*Tesla's browser blocks all RFC 1918 private IP ranges…workaround was configuring the bridge interface to assign public IP addresses*
-- TFF 论坛：即使路由器把域名 DNS 重写到内网 IP，照样连不上
-- DashPlay 文档：「特斯拉：浏览器拒绝任何局域网地址，**用名称也不行**，也不走 IPv6」
+| 产物 | 位置 | 说明 |
+|---|---|---|
+| unsigned IPA | `C:\Users\Fujitsu\Desktop\CarWithin-1.0.4-tesla-unsigned.ipa` | 3,042,839 B，SHA256 `045B52EC…01B4B5`，由 GitHub Actions #4 构建（macOS-15 / Xcode 26.3） |
+| 中继 Worker | `https://carwithin-relay.poki-yg.workers.dev` | Version `df48fbd0`，Durable Object `DeviceHub` |
+| 源码仓库 | `https://github.com/D3530L/carwithin-tesla` | public；分支 `main` |
 
-**关键推论**：`100.64.0.0/10`（CGNAT 段）不属于 RFC 1918，不在黑名单内。
-DashPlay 的「特斯拉模式」正是用它：`特斯拉用设置页显示的共享地址（默认 100.96.0.1）`。
-2026-10-15 斐讯 N1 + 特斯拉实车通过（有线/无线均出画）。
+## 3. 客户端改动（相对官方 1.0.4）
 
-## 2. DashPlay 的完整做法（供对照）
-
-| 手段 | 说明 |
+| 文件 | 作用 |
 |---|---|
-| 特斯拉模式 | 给接收端一个 `100.96.0.1` 形式的 CGNAT 地址，车机访问它而不是 192.168.x |
-| 自己的域名 | DuckDNS 子域名 + Let's Encrypt 正式证书（DNS-01），车机按 HTTPS 访问 |
-| HTTP 兼容方式（实验） | 无需域名/证书，**优先 WebRTC，连接失败时改用 JPEG 图片** |
-| 公网 IPv6 | 部分车机可用；特斯拉明确不走 IPv6 |
+| `App/MJPEGTranscoder.swift` | H.264/H.265 → VideoToolbox 解码 → JPEG；15 fps、宽 ≤1280、质量 0.55；关键帧不因限流丢弃 |
+| `App/TeslaReceiverPage.swift` | ES5 车机页：`<img src="/mjpeg">` 收流，WebSocket(`?headunit=1`) 回传触控 |
+| `App/RelayClient.swift` | 出站 WSS 连 Worker；收 `open/close/req/ws-*`，发 `[u32 id][jpeg]` 与 `res/ws-msg`；自动重连与心跳 |
+| `App/VideoOutputServer.swift` | 新增 `/mjpeg`、`/tesla` 路由；`broadcastMJPEG` 同时喂中继；`start/stop` 挂载中继；`headunit=1` 不抢主浏览器分辨率 |
+| `App/BrowserReceiverPage.swift` | 无 MSE 且无 WebCodecs → `location.replace('/tesla')` |
+| `App/Info.plist` | `CarWithinRelayHost = carwithin-relay.poki-yg.workers.dev` |
+| `.github/workflows/build-ios-unsigned.yml` | macOS 构建 unsigned IPA；从官方 IPA 取 MFi 身份文件（不入仓库） |
 
-## 3. CarWithin 的现象与差距
+## 4. 验证记录
 
-CarWithin 的接收页只有两条解码路径（`App/BrowserReceiverPage.swift`）：
+本地（wrangler dev + 模拟设备/车机）：
 
-- HTTPS + WebCodecs（低延迟）
-- HTTP + MediaSource（fMP4 over WebSocket）
+```
+device_connected: True
+stream_type: multipart/x-mixed-replace; boundary=frame   frames: 3
+page_status: 200        touch: [{id:1,x:0.5,y:0.5}] 回传到设备
+判定: PASS
+```
 
-两条都不满足时报「此浏览器缺少兼容播放器」。特斯拉既无 MSE 也无 WebCodecs → 必黑屏。
-网络侧 CarWithin 支持 HTTP/HTTPS + 本地 IP / sslip.io / DuckDNS，但都在 RFC 1918 范围内 → 特斯拉一律拒绝。
+生产（真实 Worker + 真实 WSS 出口 + HTTP 取流）：
 
-## 4. 本次适配的改动（源码已落地）
+```
+/health → 200 {"ok":true}
+设备不在线时 /d/<key>/tesla → 503 {"error":"device offline"}
+设备在线时 /d/<key>/tesla → 200 <html>carwithin relay OK</html>
+设备在线时 /d/<key>/mjpeg → 4 秒 144,180 字节 / 33 帧 multipart
+```
 
-| 文件 | 改动 |
-|---|---|
-| `App/MJPEGTranscoder.swift` | 新增：H.264/H.265 → VideoToolbox 解码 → JPEG，15 fps、宽 ≤1280、质量 0.55 |
-| `App/TeslaReceiverPage.swift` | 新增：ES5 车机页，`<img src="/mjpeg">` 收流，触控走原 WebSocket 协议 |
-| `App/VideoOutputServer.swift` | 新增 `/mjpeg`、`/tesla` 路由与 MJPEG 广播；积压 >1.5 MB 丢帧不排队 |
-| `App/BrowserReceiverPage.swift` | 无 MSE/WebCodecs 时自动 `location.replace('/tesla')` |
-| `.github/workflows/build-ios-unsigned.yml` | 新增：macOS runner 出 unsigned IPA（无需证书） |
+MJPEG 桥（不需要重编译的临时方案，`tesla-probe/mjpeg_bridge.py`）：
+拉 `http://<iPhone>:9888/video.h264` → ffmpeg → MJPEG，6 秒 135 帧、1280×720、42.5 KB/帧，首帧 PIL 可解码。
 
-## 5. 网络路径的三条选择
+## 5. 车机侧用法
 
-1. **把 Wi-Fi 网段改成 `100.64.0.0/10`**（如 `100.96.0.0/24`）：路由器 DHCP 改网段，iPhone 与车机都在此段，车机访问 `http://100.96.0.x:9888/` → 不在黑名单，直连、不经外网、不耗流量。需要路由器可自定义 DHCP 网段。
-2. **Cloudflare 隧道**：`cloudflared tunnel --url http://<iPhone IP>:9888`，车机访问 `https://xxx.trycloudflare.com`。已验证国内直连可达（200）；代价是依赖电脑、流量绕公网。
-3. **外部小盒子**（DashPlay 路线）：OpenWrt/随身 Wi-Fi 开热点并自定义网段，iPhone 与车机都连它。
+1. 装 IPA（自行签名），手机上打开 CarWithin 启动 CarPlay
+2. app 日志里找：`中继：https://carwithin-relay.poki-yg.workers.dev/d/<16位密钥>/tesla`
+3. 车机连 iPhone 热点（或任意能上网的 Wi-Fi），P 挡驻车，浏览器打开该地址
 
-## 6. 待验证
+## 6. 未完成 / 待实测
 
-- 特斯拉浏览器对 `/tesla` 页面的实测（MJPEG `<img>` 流、WebSocket 触控）
-- 100.64 网段实车可达性（需路由器改 DHCP 网段）
+- **实车验证**：特斯拉浏览器打开中继地址，确认画面与触控（本轮无车机接入记录）
+- MJPEG 在车机上的实际帧率与蜂窝上行是否够（预计 720p/8–15 fps 需 2–4 Mbps）
+- 若要把网络彻底本地化（不经公网），需把 LAN 网段改到 `100.64.0.0/10`
