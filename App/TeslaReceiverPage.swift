@@ -29,6 +29,8 @@ background:#1b1b1b;color:#e8e8e8}
 <script>
 (function(){
 var img=document.getElementById('v'),msg=document.getElementById('msg'),ui=document.getElementById('ui');
+// Works both直接访问 (/tesla) 和经中继访问 (/d/<key>/tesla): 所有子资源都相对本页目录。
+var base=location.pathname.replace(/[^\/]*$/,'');
 var started=false,frames=0,windowFrames=0,windowStart=0,fps=0,showStat=true,ws=null,wsState='未连接';
 var vw=0,vh=0;
 
@@ -36,7 +38,7 @@ function setStatus(t){msg.style.display='flex';msg.textContent=t}
 function hideStatus(){msg.style.display='none'}
 
 function reload(){
-  img.src='/mjpeg?t='+new Date().getTime();
+  img.src=base+'mjpeg?t='+new Date().getTime();
 }
 img.onload=function(){
   if(!started){started=true;hideStatus()}
@@ -109,7 +111,7 @@ if(window.PointerEvent){
 function connect(){
   if(typeof WebSocket!=='function'){wsState='不支持 WebSocket（只能看，不能点）';return}
   try{
-    ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/stream?headunit=1');
+    ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+base+'stream?headunit=1');
     ws.binaryType='arraybuffer';
   }catch(e){wsState='创建失败';return}
   ws.onopen=function(){
