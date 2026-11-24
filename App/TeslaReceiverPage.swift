@@ -30,7 +30,7 @@ background:#1b1b1b;color:#e8e8e8}
 (function(){
 var img=document.getElementById('v'),msg=document.getElementById('msg'),ui=document.getElementById('ui');
 // Works both直接访问 (/tesla) 和经中继访问 (/d/<key>/tesla): 所有子资源都相对本页目录。
-var base=location.pathname.replace(/[^\/]*$/,'');
+var base=location.pathname.replace(/[^/]*$/,'');
 var started=false,frames=0,windowFrames=0,windowStart=0,fps=0,showStat=true,ws=null,wsState='未连接';
 var vw=0,vh=0;
 
@@ -141,7 +141,7 @@ setInterval(function(){
   var now=new Date().getTime();
   if(!windowStart){windowStart=now;windowFrames=0}
   else if(now-windowStart>=1000){fps=windowFrames*1000/(now-windowStart);windowFrames=0;windowStart=now}
-  ui.textContent='MJPEG 车机模式 · 触控 '+wsState+'\n'+
+  ui.textContent='MJPEG 车机模式 · 触控 '+wsState+'\\n'+
     '画面 '+(vw||'?')+'×'+(vh||'?')+' · '+fps.toFixed(1)+' fps · 累计 '+frames+' 帧';
 },1000);
 })();
