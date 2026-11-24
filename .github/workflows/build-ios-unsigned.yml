@@ -26,6 +26,22 @@ jobs:
       - name: Show schemes
         run: xcodebuild -list -project TDSCarKit.xcodeproj
 
+      # The project references App/BundledIdentity/{certificate.p7b,leaf.cer,private.x963}, but the
+      # source archive deliberately omits them (they are the app's MFi identity). Pull them out of
+      # the official release build instead of keeping private key material in this repository.
+      - name: Stage bundled MFi identity from the official IPA
+        run: |
+          set -euo pipefail
+          mkdir -p App/BundledIdentity
+          curl -fL --retry 3 -o /tmp/orig.ipa \
+            https://github.com/xmz28/CarWithin/releases/download/v1.0.4/CarWithin-1.0.4-unsigned.ipa
+          unzip -q /tmp/orig.ipa -d /tmp/orig
+          APP=$(find /tmp/orig/Payload -maxdepth 1 -name '*.app' | head -n1)
+          for f in certificate.p7b leaf.cer private.x963; do
+            cp "$APP/$f" App/BundledIdentity/"$f"
+          done
+          ls -l App/BundledIdentity
+
       - name: Build (unsigned)
         run: |
           set -o pipefail
